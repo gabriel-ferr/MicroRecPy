@@ -17,6 +17,7 @@
 //              * Include the libraries that we will use.
 #include <vector>
 #include <numeric>
+#include <pybind11/numpy.h>
 //      -------------------------------------------------------------------------------------------------------
 //              * Namespace RecurrenceMicrostates
 namespace RecurrenceMicrostates {
@@ -40,6 +41,7 @@ namespace RecurrenceMicrostates {
         explicit Tensor(const std::vector<size_t> &shape) : shape(shape) {
             body.resize(std::accumulate(shape.begin(), shape.end(), size_t{1}, std::multiplies()));
         }
+        explicit Tensor(const pybind11::array_t<T> &array);
 
         //      Operator [] to access / modify elements.
         template <typename... Args> T& operator[] (Args... args) {

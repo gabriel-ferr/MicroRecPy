@@ -32,6 +32,15 @@ bool RecurrenceMicrostates::std_recurrence(const std::vector<double> &x, const s
     return params[0] - std::sqrt(distance) >= 0;
 }
 //      -------------------------------------------------------------------------------------------------------
+template<typename T> std::vector<T> RecurrenceMicrostates::numpy_to_vector(const pybind11::array_t<T> &array) {
+    pybind11::buffer_info info = array.request();
+
+    if (info.ndim != 1) throw std::invalid_argument("[ERROR] Recurrence Microstates - Utils: waiting a one dimentional array.");
+
+    T* data = static_cast<T*>(info.ptr);
+    return std::vector<T>(data, data + info.shape[0]);
+}
+//      -------------------------------------------------------------------------------------------------------
 void RecurrenceMicrostates::Probabilities::compute_to_vector(const std::vector<double> &params) {
     //      Alloc some memory =3
     size_t counter = 0;
@@ -120,27 +129,29 @@ bool RecurrenceMicrostates::Probabilities::call_user_function(const std::vector<
     ).cast<bool>();
 }
 //      -------------------------------------------------------------------------------------------------------
-RecurrenceMicrostates::Probabilities::Probabilities(const Settings &settings, const Tensor<double> &data_x,
-    const Tensor<double> &data_y, const std::vector<double> &params, double sample_rate, const pybind11::function &func) :
-    settings(settings), sample_rate(sample_rate), data_x(data_x), data_y(data_y), function(func) {
+RecurrenceMicrostates::Probabilities::Probabilities(const pybind11::capsule &settings, const pybind11::array_t<double> &data_x,
+              const pybind11::array_t<double> &data_y, const pybind11::array_t<double> &params, double sample_rate,
+              const pybind11::function &func) : sample_rate(sample_rate), function(func), data_x(data_x), data_y(data_y),
+              settings(*static_cast<Settings*>(settings.get_pointer())){
+
     //      Check the input arguments.
-    if (data_x.dimensions() != data_y.dimensions())
+    if (this->data_x.dimensions() != this->data_y.dimensions())
         throw std::invalid_argument(
             "[ERROR] Recurrence Microstates - Probabilities: data x and data y must have the same number of dimensions.");
-    if (data_x.dimension(0) != data_y.dimension(0))
+    if (this->data_x.dimension(0) != this->data_y.dimension(0))
         throw std::invalid_argument(
             "[ERROR] Recurrence Microstates - Probabilities: data x and data y first dimension must have the same size.");
 
-    const auto dims = data_x.dimensions().size() - 1;
+    const auto dims = this->data_x.dimensions().size() - 1;
     const auto D = 2 * dims;
 
-    if (settings.dimensions() != D)
+    if (this->settings.dimensions() != D)
         throw std::invalid_argument(
             "[ERROR] Recurrence Microstates - Settings: the configured microstate structure and the given data are not compatible.");
 
     //      Get the dimensions.
-    auto dims_x = data_x.dimensions();
-    auto dims_y = data_y.dimensions();
+    auto dims_x = this->data_x.dimensions();
+    auto dims_y = this->data_y.dimensions();
 
     //      Compute the recurrence space hypervolume.
     const auto hypervolume = std::accumulate(dims_x.begin() + 1, dims_x.end(), size_t{1}, std::multiplies()) *
@@ -154,8 +165,8 @@ RecurrenceMicrostates::Probabilities::Probabilities(const Settings &settings, co
 
     std::vector samples(numb_samples, std::vector<size_t>(D, 0));
     for (size_t dim = 0; dim < dims; dim++) {
-        const auto max_x = dims_x[dim + 1] - settings.structure(dim);
-        const auto max_y = dims_y[dim + 1] - settings.structure(dim);
+        const auto max_x = dims_x[dim + 1] - this->settings.structure(dim);
+        const auto max_y = dims_y[dim + 1] - this->settings.structure(dim);
 
         std::uniform_int_distribution<size_t> dist_x(0, max_x);
         std::uniform_int_distribution<size_t> dist_y(0, max_y);
@@ -167,12 +178,12 @@ RecurrenceMicrostates::Probabilities::Probabilities(const Settings &settings, co
     }
 
     //      Now, we divide the work between each available thread =D
-    const auto int_number = numb_samples / settings.available_threads();
-    auto rest_number = numb_samples % settings.available_threads();
+    const auto int_number = numb_samples / this->settings.available_threads();
+    auto rest_number = numb_samples % this->settings.available_threads();
     size_t start_index = 0;
 
-    this->samples.resize(settings.available_threads());
-    for (size_t i = 0; i < settings.available_threads(); i++) {
+    this->samples.resize(this->settings.available_threads());
+    for (size_t i = 0; i < this->settings.available_threads(); i++) {
         const auto numb = int_number + (rest_number > 0 ? 1 : 0);
         this->samples[i].resize(numb);
 
@@ -185,6 +196,6 @@ RecurrenceMicrostates::Probabilities::Probabilities(const Settings &settings, co
         if (rest_number > 0) --rest_number;
     }
 
-    if (settings.dictionary()) this->compute_to_dict(params);
-    else this->compute_to_vector(params);
+    if (this->settings.dictionary()) this->compute_to_dict(numpy_to_vector(params));
+    else this->compute_to_vector(numpy_to_vector(params));
 }

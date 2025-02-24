@@ -15,6 +15,8 @@
 #include "tensor.h"
 //                * Include the used libraries.
 #include <vector>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 //      -------------------------------------------------------------------------------------------------------
 template<typename T>
 size_t RecurrenceMicrostates::Tensor<T>::get_index(const std::vector<size_t> &shape) const {
@@ -50,3 +52,8 @@ std::vector<T> RecurrenceMicrostates::Tensor<T>::vector(const std::vector<size_t
 
     return result;
 }
+//      -------------------------------------------------------------------------------------------------------
+template<typename T>
+RecurrenceMicrostates::Tensor<T>::Tensor(const pybind11::array_t<T> &array) {
+}
+//      -------------------------------------------------------------------------------------------------------

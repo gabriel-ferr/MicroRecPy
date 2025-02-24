@@ -18,6 +18,7 @@
 #include <tuple>
 #include <vector>
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 
 #include "tensor.h"
 #include "settings.h"
@@ -28,15 +29,19 @@ namespace RecurrenceMicrostates {
     //              * Default recurrence function
     inline bool std_recurrence(const std::vector<double> &x, const std::vector<double> &y, const std::vector<double> &params);
     //      -------------------------------------------------------------------------------------------------------
+    //              * Util function to convert a NumPy Array to a std::vector.
+    template<typename T> std::vector<T> numpy_to_vector(const pybind11::array_t<T> &array);
+    //      -------------------------------------------------------------------------------------------------------
     //              * Our Probabilities class structure.
     class Probabilities {
         std::vector<std::vector<std::vector<size_t>>> samples;
 
-        const Settings settings;
         const double sample_rate;
+        const pybind11::function function;
         const Tensor<double> data_x;
         const Tensor<double> data_y;
-        const pybind11::function function;
+
+        Settings settings;
 
         std::vector<double> vect_result;
 
@@ -54,8 +59,9 @@ namespace RecurrenceMicrostates {
             const pybind11::function &function);
 
     public:
-          explicit Probabilities(const Settings &settings, const Tensor<double> &data_x, const Tensor<double> &data_y,
-                             const std::vector<double> &params, double sample_rate = 0.2, const pybind11::function &func = pybind11::none());
+          explicit Probabilities(const pybind11::capsule &settings, const pybind11::array_t<double> &data_x,
+              const pybind11::array_t<double> &data_y, const pybind11::array_t<double> &params, double sample_rate = 0.2,
+              const pybind11::function &func = pybind11::none());
     };
     //      -------------------------------------------------------------------------------------------------------
 }
